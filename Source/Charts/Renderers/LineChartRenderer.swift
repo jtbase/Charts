@@ -395,7 +395,9 @@ open class LineChartRenderer: LineRadarRenderer
                 return
             }
 
-            var firstPoint = true
+			context.beginPath()
+			var firstPoint = true
+			var closePath = false
 
             let path = CGMutablePath()
             for x in stride(from: _xBounds.min, through: _xBounds.range + _xBounds.min, by: 1)
@@ -411,14 +413,25 @@ open class LineChartRenderer: LineRadarRenderer
                 
                 if firstPoint
                 {
-                    path.move(to: startPoint)
-                    firstPoint = false
+					if e1.visible {
+						context.move(to: startPoint)
+						firstPoint = false
+					} else if e2.visible {
+						context.move(to: CGPoint(
+							x: CGFloat(e2.x),
+							y: CGFloat(e2.y * phaseY)
+							).applying(valueToPixelMatrix))
+					}
                 }
-                else
-                {
-                    path.addLine(to: startPoint)
-                }
-                
+				else if e1.visible
+				{
+					if closePath {
+						continue
+					} else {
+						context.addLine(to: startPoint)
+					}
+				}
+
                 if isDrawSteppedEnabled
                 {
                     let steppedPoint =
@@ -426,29 +439,34 @@ open class LineChartRenderer: LineRadarRenderer
                             x: CGFloat(e2.x),
                             y: CGFloat(e1.y * phaseY))
                         .applying(valueToPixelMatrix)
-                    path.addLine(to: steppedPoint)
+					context.addLine(to: steppedPoint)
                 }
 
-                let endPoint =
-                    CGPoint(
-                        x: CGFloat(e2.x),
-                        y: CGFloat(e2.y * phaseY))
-                    .applying(valueToPixelMatrix)
-                path.addLine(to: endPoint)
+				if e2.visible {
+					if closePath {
+						context.move(to: CGPoint(
+							x: CGFloat(e2.x),
+							y: CGFloat(e2.y * phaseY)
+							).applying(valueToPixelMatrix))
+						closePath = false
+					} else {
+						context.addLine(to: CGPoint(
+							x: CGFloat(e2.x),
+							y: CGFloat(e2.y * phaseY)
+							).applying(valueToPixelMatrix))
+					}
+				} else {
+					closePath = true
+				}
             }
             
             if !firstPoint
             {
-                if dataSet.isDrawLineWithGradientEnabled {
-                    drawGradientLine(context: context, dataSet: dataSet, spline: path, matrix: valueToPixelMatrix)
-                } else {
-                    context.beginPath()
-                    context.addPath(path)
-                    context.setStrokeColor(dataSet.color(atIndex: 0).cgColor)
-                    context.strokePath()
-                }
+				context.setStrokeColor(dataSet.color(atIndex: 0).cgColor)
+				context.strokePath()
             }
         }
+		context.restoreGState()
     }
     
     open func drawLinearFill(context: CGContext, dataSet: LineChartDataSetProtocol, trans: Transformer, bounds: XBounds)
